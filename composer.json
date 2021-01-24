@@ -1,0 +1,12 @@
+{
+    "require": {
+        "vlucas/phpdotenv": "^5.3",
+        "ext-pdo": "*",
+        "illuminate/database": "^8.24"
+    },
+    "autoload": {
+        "psr-4": {
+            "core\\": "core"
+        }
+    }
+}
