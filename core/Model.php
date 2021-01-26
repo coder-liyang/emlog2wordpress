@@ -6,7 +6,6 @@ namespace core;
 
 abstract class Model
 {
-    abstract public function tableName(): string;
 
     protected function bind(Model $model, array $data)
     {
@@ -18,8 +17,8 @@ abstract class Model
         return $model;
     }
 
-    public function truncate(Wordpress $wordpress, string $tableName)
+    public function truncate(string $tableName)
     {
-        return $wordpress->db->exec('truncate ' . $tableName);
+        WpDb::db()->table($tableName)->truncate();
     }
 }

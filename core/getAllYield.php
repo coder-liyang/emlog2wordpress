@@ -14,7 +14,7 @@ trait getAllYield
      */
     public function getAllYield(): Generator
     {
-        $res = Emlog::getInstance()->db->query(sprintf('select * from %s', $this->tableName()));
+        $res = ElDb::db()->query(sprintf('select * from %s', $this->tableName()));
         while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
             yield $this->bind(new self(), $row);
         }

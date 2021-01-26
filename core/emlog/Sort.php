@@ -9,6 +9,8 @@ use core\Model;
 
 class Sort extends Model
 {
+    // protected $connection = 'default';
+
     use getAllYield;
 
     public $sid;
@@ -18,13 +20,5 @@ class Sort extends Model
     public $pid;
     public $description;
     public $template;
-
-    /**
-     * @return string
-     */
-    public function tableName(): string
-    {
-        return $_ENV['EMLOG_DB_PREFIX'] . 'sort';
-    }
 
 }
