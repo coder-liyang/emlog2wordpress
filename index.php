@@ -9,10 +9,14 @@ require 'vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
-// //连接emlog数据库
-\core\ElDb::db();
-// //连接wordpress数据库
-\core\WpDb::db();
+printf("即将执行迁移,是否确认?[y/n]\n");
+$handle = fopen ("php://stdin","r");
+$line = fgets($handle);
+if(trim($line) != 'y'){
+    echo "停止迁移!\n";
+    exit;
+}
+fclose($handle);
 
 
 $move = new \core\Move();
