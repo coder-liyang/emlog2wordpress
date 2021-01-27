@@ -152,7 +152,7 @@ class Move
         $id1 = WpDb::db()->table('terms')->where(['term_id' => 1])->first();
         $taxonomy1 = WpDb::db()->table('term_taxonomy')->where(['term_id' => 1])->first();
         //修改1的分类为'未分类', parent=0
-        WpDb::db()->table('terms')->where(['term_id' => 1])->update(['name' => '未分类', 'slug' => 'null']);
+        WpDb::db()->table('terms')->where(['term_id' => 1])->update(['name' => '未分类', 'slug' => 'uncategorized']);
         WpDb::db()->table('term_taxonomy')->where(['term_id' => 1])->update(['parent' => 0]);
         //将1分类的内容复制一份插入,得到新ID
         $id1Arr = (array)$id1;
