@@ -4,6 +4,7 @@ namespace core;
 
 use core\emlog\Link;
 use core\emlog\Sort;
+use core\wordpress\Comments;
 use core\wordpress\Links;
 use core\wordpress\Posts;
 use core\wordpress\Terms;
@@ -19,6 +20,9 @@ class Move
         //内容
         $this->blog();
         //评论
+        $this->comment();
+        //修正一些数据
+        $this->fix();
         return true;
     }
 
@@ -34,6 +38,7 @@ class Move
         $wordpressTerms = new Terms();
         foreach(ElDb::db()->table('sort')->get() as $row) {
             $wordpressTerms->push($row);
+            printf("分类:%s,迁移成功\n", $row->sortname);
         }
     }
 
@@ -63,6 +68,10 @@ class Move
 
     public function blog()
     {
+        $post_type = [
+            'blog' => 'post',
+            'page' => 'page',
+        ];
         WpDb::db()->table('posts')->truncate();
         foreach (ElDb::db()->table('blog')->get() as $row) {
             $posts = new Posts();
@@ -93,7 +102,7 @@ class Move
             $posts->post_parent = 0;
             $posts->guid = '';
             $posts->menu_order = 0;
-            $posts->post_type = 'post'; //TODO
+            $posts->post_type = $post_type[$row->type];
             $posts->post_mime_type = '';
             $posts->comment_count = 0;
             WpDb::db()->table('posts')->insert((array)$posts);
@@ -101,9 +110,62 @@ class Move
             $termsRelationships = new TermsRelationships();
             $termsRelationships->object_id = $row->gid;
             // $termsRelationships->term_taxonomy_id = $row->sortid;
-            $termsRelationships->term_taxonomy_id = (int)WpDb::db()->table('term_taxonomy')->where(['term_id' => $row->sortid])->first()->term_taxonomy_id;
+            $termsRelationships->term_taxonomy_id = ($temp = WpDb::db()->table('term_taxonomy')->where(['term_id' => $row->sortid])->first())?$temp->term_taxonomy_id:0;
             $termsRelationships->term_order = 0;
             WpDb::db()->table('term_relationships')->insert((array)$termsRelationships);
+
+            printf("文章:%s,迁移成功\n", $row->title);
         }
+
+    }
+
+    public function comment()
+    {
+        WpDb::db()->table('comments')->truncate();
+        foreach (ElDb::db()->table('comment')->get() as $row) {
+            $comments = new Comments();
+            $comments->comment_ID = $row->cid;
+            $comments->comment_post_ID = $row->gid;
+            $comments->comment_author = $row->poster;
+            $comments->comment_author_email = $row->mail;
+            $comments->comment_author_url = $row->url;
+            $comments->comment_author_IP = $row->ip;
+            $comments->comment_date = date('Y-m-d H:i:s', $row->date);
+            $comments->comment_date_gmt = date('Y-m-d H:i:s', $row->date - 3600 * 8);
+            $comments->comment_content = $row->comment;
+            $comments->comment_karma = 0;
+            $comments->comment_approved = $row->hide == 'n' ? 1 : 0;
+            $comments->comment_agent = '';
+            $comments->comment_type = 'comment';
+            $comments->comment_parent = $row->pid;
+            $comments->user_id = 0;
+            WpDb::db()->table('comments')->insert((array)$comments);
+            printf("评论:%s,迁移成功\n", $row->comment);
+
+        }
+    }
+
+    public function fix()
+    {
+        printf("由于WordPress将ID为1的分类作为默认分类,因此这里将1号分类给重置成为默认分类\n");
+        //查看1分类目前的内容
+        $id1 = WpDb::db()->table('terms')->where(['term_id' => 1])->first();
+        $taxonomy1 = WpDb::db()->table('term_taxonomy')->where(['term_id' => 1])->first();
+        //修改1的分类为'未分类', parent=0
+        WpDb::db()->table('terms')->where(['term_id' => 1])->update(['name' => '未分类', 'slug' => 'null']);
+        WpDb::db()->table('term_taxonomy')->where(['term_id' => 1])->update(['parent' => 0]);
+        //将1分类的内容复制一份插入,得到新ID
+        $id1Arr = (array)$id1;
+        unset($id1Arr['term_id']);
+        $newId = WpDb::db()->table('terms')->insertGetId($id1Arr);
+        $taxonomy1Arr = (array)$taxonomy1;
+        unset($taxonomy1Arr['term_taxonomy_id']);
+        $taxonomy1Arr['term_id'] = $newId;
+        $new_term_taxonomy_id = WpDb::db()->table('term_taxonomy')->insertGetId($taxonomy1Arr);
+        //将分类中父ID为1的改为新ID
+        WpDb::db()->table('term_taxonomy')->where(['parent' => 1])->update(['parent' => $new_term_taxonomy_id]);
+        //将文章中分类ID为1的改为新ID
+        WpDb::db()->table('term_relationships')->where(['term_taxonomy_id' => $taxonomy1->term_taxonomy_id])->update(['term_taxonomy_id' => $new_term_taxonomy_id]);
+        printf("数据修正完成\n");
     }
 }

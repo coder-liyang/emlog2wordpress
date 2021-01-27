@@ -28,4 +28,4 @@ try {
 }
 WpDb::db()->commit();
 echo "迁移完成\n";
-echo "请手动将emlog下的/content/uploadfile文件夹复制到wordpress下的wp-content/uploads/emlog目录";
+echo "请手动将emlog下的/content/uploadfile文件夹复制到wordpress下的wp-content/uploads/emlog目录\n";
