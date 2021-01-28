@@ -2,13 +2,11 @@
 
 namespace core;
 
-use core\emlog\Link;
-use core\emlog\Sort;
 use core\wordpress\Comments;
-use core\wordpress\Links;
 use core\wordpress\Posts;
 use core\wordpress\Terms;
 use core\wordpress\TermsRelationships;
+use core\wordpress\TermsTaxonomy;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class Move
@@ -36,9 +34,23 @@ class Move
         WpDb::db()->table('term_taxonomy')->truncate();
         WpDb::db()->table('term_relationships')->truncate();
         $wordpressTerms = new Terms();
-        foreach(ElDb::db()->table('sort')->get() as $row) {
-            $wordpressTerms->push($row);
-            printf("分类:%s,迁移成功\n", $row->sortname);
+        foreach(ElDb::db()->table('sort')->get() as $sort) {
+            $terms = new Terms();
+            //terms ID为1的分类会被认定为默认分类,如果不满足实际需求,后面需要手动修改
+            $terms->term_id = $sort->sid;
+            $terms->name = $sort->sortname;
+            $terms->slug = $sort->alias;
+            $terms->term_group = $sort->taxis;
+            WpDb::db()->table('terms')->insert((array)$terms);
+            //terms_taxonomy
+            $termsTaxonomy = new TermsTaxonomy();
+            $termsTaxonomy->term_id = $terms->term_id;
+            $termsTaxonomy->taxonomy = 'category';
+            $termsTaxonomy->description = $sort->description;
+            $termsTaxonomy->parent = $sort->pid;
+            $termsTaxonomy->count = 0; //分类下文章的数量,后期导入文章的时候再填这个值
+            WpDb::db()->table('term_taxonomy')->insert((array)$termsTaxonomy);
+            printf("分类:%s,迁移成功\n", $sort->sortname);
         }
     }
 
@@ -74,20 +86,22 @@ class Move
         ];
         WpDb::db()->table('posts')->truncate();
         foreach (ElDb::db()->table('blog')->get() as $row) {
+            $emlogPrefix = rtrim($_ENV['EMLOG_REPLACE'], '/') . '/content/uploadfile';
+            $wordpressPrefix = rtrim($_ENV['WORDPRESS_REPLACE']) . '/wp-content/uploads/emlog';
             $posts = new Posts();
             $posts->ID = $row->gid;
             $posts->post_author = $row->author;
             $posts->post_date = date('Y-m-d H:i:s', $row->date);
             $posts->post_date_gmt = date('Y-m-d H:i:s', $row->date - 3600 * 8);
             $posts->post_content = str_replace(
-                $_ENV['EMLOG_REPLACE'],
-                $_ENV['WORDPRESS_REPLACE'],
+                $emlogPrefix,
+                $wordpressPrefix,
                 $row->content
             );//转换一下内容中的附件地址
             $posts->post_title = $row->title;
             $posts->post_excerpt = str_replace(
-                $_ENV['EMLOG_REPLACE'],
-                $_ENV['WORDPRESS_REPLACE'],
+                $emlogPrefix,
+                $wordpressPrefix,
                 $row->excerpt
             );//转换一下内容中的附件地址
             $posts->post_status = $row->hide == 'n' ? 'publish' : 'draft';
